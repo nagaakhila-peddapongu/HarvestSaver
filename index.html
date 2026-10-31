@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HarvestSaver prototype</title>
+<style>
+:root{--bg:#FFFFFF;--surface:#F1F6EE;--ink:#1B2B22;--muted:#556B5D;--accent:#2F5D3A;--onaccent:#fff;--line:#C9D9C5;--ok:#2F7D46;--warn:#B7791F;--bad:#B3392F;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10201A;--surface:#17302A;--ink:#EEF4EC;--muted:#A9BFB0;--accent:#8FC79B;--onaccent:#10201A;--line:#2C4A40;--ok:#7CCB94;--warn:#E3B45F;--bad:#EE8B80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10201A;--surface:#17302A;--ink:#EEF4EC;--muted:#A9BFB0;--accent:#8FC79B;--onaccent:#10201A;--line:#2C4A40;--ok:#7CCB94;--warn:#E3B45F;--bad:#EE8B80;color-scheme:dark}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+h1{font:800 clamp(2rem,8vw,2.8rem)/1.05 Georgia,"Times New Roman",serif;letter-spacing:-.02em;margin:8px 0 6px;color:var(--accent)}
+h2{font-size:1.05rem;margin:0 0 8px}
+.lede{color:var(--muted);margin:0 0 20px}
+.badge{display:inline-block;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:99px;padding:2px 10px;font-size:.8rem}
+form{display:grid;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+label{display:grid;gap:4px;font-weight:600;font-size:.95rem}
+select,input{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.check{display:flex;gap:10px;align-items:center;font-weight:600}
+.check input{width:auto}
+button{font:inherit;font-weight:700;padding:12px 16px;border-radius:8px;border:0;background:var(--accent);color:var(--onaccent);cursor:pointer}
+button.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#out{margin-top:22px}
+.card{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.status{font-size:1.5rem;font-weight:800;margin:0}
+.bar{height:12px;border-radius:99px;background:var(--surface);border:1px solid var(--line);overflow:hidden;margin:10px 0 6px}
+.bar i{display:block;height:100%;background:currentColor}
+ul{margin:0;padding-left:20px}li{margin:4px 0}
+.small{font-size:.85rem;color:var(--muted)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+footer{margin-top:28px;font-size:.82rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<span class="badge">Prototype &middot; demo rules</span>
+<h1>HarvestSaver</h1>
+<p class="lede">Just harvested? Tell us what you have and get a plan for the next few hours.</p>
+
+<form id="f">
+  <label>Crop
+    <select id="crop"></select>
+  </label>
+  <div class="row">
+    <label>Quantity (kg or litres)
+      <input id="qty" type="number" min="1" value="50" inputmode="numeric">
+    </label>
+    <label>Hours since harvest
+      <input id="hrs" type="number" min="0" value="4" inputmode="numeric">
+    </label>
+  </div>
+  <label>Village
+    <input id="vil" type="text" placeholder="Your village name">
+  </label>
+  <label class="check"><input id="veh" type="checkbox"> I have transport available</label>
+  <button type="submit">Get my plan</button>
+</form>
+
+<div id="out" aria-live="polite"></div>
+
+<section id="saved" hidden>
+  <h2>Saved plans</h2>
+  <div id="list"></div>
+</section>
+
+<footer>
+  Demo prototype. Freshness windows and tips are indicative sample rules and must be validated with agriculture experts before real use. Storage and buyer entries are sample placeholders, not real listings.
+</footer>
+</main>
+
+<script>
+const CROPS={
+ "Milk":{h:5,t:["Keep in clean, covered steel or food-grade containers.","Keep in shade and away from the sun.","Take it to the nearest chilling or collection centre as early as possible."]},
+ "Leafy greens (spinach, coriander)":{h:24,t:["Sprinkle lightly with clean water and cover with a damp cloth.","Keep in shade in ventilated crates, loosely packed.","Remove yellow or damaged leaves before packing."]},
+ "Okra":{h:36,t:["Pick and pack carefully to avoid bruising.","Keep in ventilated crates in shade.","Sell or move within a day for best price."]},
+ "Cauliflower":{h:60,t:["Keep in shade with leaves on to protect the head.","Use ventilated crates, no heavy stacking.","Keep away from direct sun and rain."]},
+ "Tomato":{h:96,t:["Sort ripe from unripe and pack separately.","Use shallow crates; do not pile deeply.","Keep in shade; a wet-cloth cover on the crate area can lower heat."]},
+ "Mango":{h:96,t:["Handle gently to avoid bruises.","Keep in shade in single layers or padded crates.","Separate ripe fruit and sell it first."]},
+ "Onion":{h:720,t:["Cure in shade until the skin is dry.","Store in a dry, airy place off the floor.","Remove damaged bulbs to protect the rest."]},
+ "Potato":{h:720,t:["Store in a dark, cool, ventilated place.","Do not keep in sunlight; it turns green.","Remove damaged or rotting tubers early."]}
+};
+const sel=document.getElementById("crop");
+Object.keys(CROPS).forEach(k=>{const o=document.createElement("option");o.textContent=k;sel.appendChild(o)});
+const out=document.getElementById("out"),list=document.getElementById("list"),saved=document.getElementById("saved");
+let plans=[];
+try{plans=JSON.parse(localStorage.getItem("hs_plans")||"[]")}catch(e){plans=[]}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=h=>h>=48?Math.round(h/24)+" days":Math.round(h)+" hours";
+function renderSaved(){
+  saved.hidden=!plans.length;
+  list.innerHTML=plans.map(p=>`<div class="card"><strong>${esc(p.crop)}</strong>, ${esc(p.qty)} units${p.vil?" from "+esc(p.vil):""}<div class="small">${esc(p.status)} &middot; ${esc(p.date)}</div></div>`).join("");
+}
+function persist(){try{localStorage.setItem("hs_plans",JSON.stringify(plans))}catch(e){}}
+document.getElementById("f").addEventListener("submit",e=>{
+  e.preventDefault();
+  const crop=sel.value,c=CROPS[crop],qty=+document.getElementById("qty").value||0,hrs=Math.max(0,+document.getElementById("hrs").value||0);
+  const vil=document.getElementById("vil").value.trim(),veh=document.getElementById("veh").checked;
+  const used=hrs/c.h,left=Math.max(0,c.h-hrs);
+  let cls,status;
+  if(used>=1){cls="bad";status="Past the typical window"}
+  else if(used>.75){cls="bad";status="Act now"}
+  else if(used>.4){cls="warn";status="Act soon"}
+  else{cls="ok";status="Fresh, plan your move"}
+  const acts=[];
+  if(used>=1) acts.push("Check quality carefully. Sell sound produce locally today and separate anything spoiled.");
+  else if(used>.4) acts.push("Sell or move this produce within about "+fmt(left)+".");
+  else acts.push("You have about "+fmt(left)+" of typical freshness left. Compare options before selling.");
+  acts.push(veh?"You have transport: offer spare space to neighbours and share the cost.":"No transport: ask neighbours with the same crop to pool one vehicle.");
+  if(qty>=100) acts.push("Larger lot: ask the nearest storage or collection centre about space.");
+  out.innerHTML=`
+  <div class="card ${cls}"><p class="status">${status}</p>
+    <div class="bar" role="img" aria-label="Freshness window used"><i style="width:${Math.min(100,Math.round(used*100))}%"></i></div>
+    <div class="small">${Math.round(Math.min(1,used)*100)}% of the typical window used &middot; about ${fmt(left)} left</div></div>
+  <div class="card"><h2>What to do next</h2><ul>${acts.map(a=>`<li>${a}</li>`).join("")}</ul></div>
+  <div class="card"><h2>Keep it fresh</h2><ul>${c.t.map(a=>`<li>${a}</li>`).join("")}</ul></div>
+  <div class="card"><h2>Nearby options${vil?" for "+esc(vil):""}</h2>
+    <ul><li>Village collection point <span class="small">(sample entry)</span></li><li>Nearest cold storage <span class="small">(sample entry)</span></li><li>Local transporter for shared loads <span class="small">(sample entry)</span></li></ul>
+    <p class="small">Real contacts will be collected and verified during the pilot.</p></div>
+  <button class="alt" id="save" type="button">Save this plan</button>`;
+  document.getElementById("save").onclick=()=>{
+    plans.unshift({crop,qty,vil,status,date:new Date().toLocaleDateString()});plans=plans.slice(0,10);persist();renderSaved();
+    document.getElementById("save").textContent="Plan saved";
+  };
+  out.scrollIntoView({behavior:"smooth",block:"start"});
+});
+renderSaved();
+</script>
+</body>
+</html>
